@@ -114,13 +114,19 @@ Let’s first create a vocabulary-based DTM. Here we collect unique terms from a
 ```{r}
 it_train_list <- list(1:length(data.files))
 vocab <- list(1:length(data.files))
+cluster_number <- vector(length=length(data.files))
+paper_id <- vector(length=length(data.files))
+  
 for (j in 1:length(data.files)) {
   data_unlist <- unlist(data_list[[j]])
   paper_title<- as.vector(data_unlist[which(names(data_unlist)=="paper_title")])
+  paper_id[j]<- as.vector(data_unlist[which(names(data_unlist)=="paper_id")])
+  #calculate actual researchers size for each list
+  cluster_number[j]=length(unique(as.vector(data_unlist[which(names(data_unlist)=="author_id")])))
   it_train_list[[j]] <- itoken(paper_title, 
              preprocessor = tolower, 
              tokenizer = word_tokenizer,
-             ids = AKumar$PaperID,
+             ids = paper_id[j],
              progressbar = FALSE)
 vocab[[j]] <- create_vocabulary(it_train, stopwords = c("a", "an", "the", "in", "on",
                                                    "at", "of", "above", "under"))
@@ -182,16 +188,72 @@ for (i in 1:length(data.files)){
   p <- length(coauthor_list)
   
   #construct submatrix
+  #construct Mp
   Mp <- diag(n)
+  #construct Map
+  Map <- Matrix(rep(0,n*p),p,n)
+  for(j in 1:p){
+    for(i in 1:n){
+       Map[j,i] =ifelse(coauthor_list[j] %in% group[[i]]$coauthor_list,1,0)
+       #whether aj is the co-author in pi
+    }
+        }
+  #transform the Matrix
+  #construct Mpa
+  Mpa <- t(Map)
   
-  
-  
+  #construct Ma(let's limit our database in the data_list)
+  Ma <- Matrix(rep(0,p^2),p,p)
+  for (i in 1:p){
+    for(j in 1:p){
+      #Ma[i,j]=1 indicates coauthor_i and coauthor_j in the same publication
+      #if both Map[i,m]=1 & Mpa[m,j]=1, Ma[i,j]=1
+         Ma[i,j]=ifelse(Map[i,]%*%Mpa[,j]>0,1,0)
+    }
+  }
+    
+  M[[i]] <- cbind(rbind(Mp,Map),rbind(Mpa,Ma))
+}
+#coauthor constraint
+M1 <- list(1:length(data.files))
+for (i in 1:length(data.files)){
+  M1[[i]] <- M[[i]]%*%M[[i]]
+}
+#Assume tao=2, then we get 2-coauthor constraint
+M2 <- list(1:length(data.files))
+for (i in 1:length(data.files)){
+  M2[[i]] <- M1[[i]]%*%M[[i]]
 }
 
 ```
 
 Objective Function 
 ```{r}
+for(s= 1:length(data.files)){
+##HMRF Ojective function for list s
+# Data set X: dtm_train_tfidf[[i]];Weights:w1=0.7,w2=0.7^2; 
+#c1(pi,pj)=1 if and only M1[i,j]=1; and c2(pi,pj)=1 if and only M2[i,j]=1;
+#D(xi,xj) is the [i,j]element of the cosine similarity matrix D; 
+#label Li is obtained from the E-Step of EM algorithm; yli is the centroid point obtained from the M-step
+#k indicates real researcher number
+k=cluster_number[s]
+w1 <- 0.7
+w2 <- 0.7^2
+n <- length(data_list[[s]])
+objf <-function(w1=0.7,w2=0.7^2,M1=M1,M2=M2,n=n,D,L){
+  I <- matrix(rep(0,n^2),n,n)
+  #Asumme Label(cluster) is a vector with length=n
+  for(i in 1:n){
+    for(j in 1:n){
+      I[i,j] <- ifelse(Label[i]==label[j],1,0)
+      f1 <- D[i,j]*I[i,j]*(w1*M1[i,j]+w2*M2[i,j])
+      yli <-mean(dtm_train_tfidf[[i]])
+    }
+  }
+ 
+}
+}
+
 
 ```
 
