@@ -132,7 +132,7 @@ vocab[[j]]
 }
 ```
 
-Here, we remove pre-defined stopwords, the words like ¡°a¡±, ¡°the¡±, ¡°in¡±, ¡°I¡±, ¡°you¡±, ¡°on¡±, etc, which do not provide much useful information. 
+Here, we remove pre-defined stopwords, the words like ??a??, ??the??, ??in??, ??I??, ??you??, ??on??, etc, which do not provide much useful information. 
 
 Now that we have a vocabulary list, we can construct a document-term matrix.
 ```{r}
@@ -165,9 +165,9 @@ dtm_train_tfidf[[i]] <- fit_transform(dtm_train[[i]], tfidf)
 
 ```
 
-## Step 3: Write HMRFEM Algorithm
+## Step 3: Write HMRF EM Algorithm
 
-Construct Sets of must-link Constraints
+Construct Sets of must-link Constraints - to be explained
 ```{r}
 M <- list(1:length(data.files))
 for (i in 1:length(data.files)){
@@ -184,24 +184,56 @@ for (i in 1:length(data.files)){
   
   #construct submatrix
   Mp <- diag(n)
-  
-  
-  
 }
 
 ```
 
 Define distance function D(xi,xj)
 ```{r}
+# This function compute the distance as described in the paper using a (squared) matrix A and two vectors of the same length. Vectors must have the same lenght of the dimention of the matrix. 
+distance = function(A,xi,xj){
+  A = as.matrix(A)
+  xi = as.matrix(xi)
+  xj = as.matrix(xj)
+  normxi = sqrt(t(xi) %*% A %*% xi)[1]
+  normxj = sqrt(t(xj) %*% A %*% xj)[1]
+  return(1 - (t(xi) %*% A %*% xj)[1]/(normxi*normxj))
+}
 ```
+
+Define contraints 2
+```{r}
+constraint2 <-function(i,j,name){
+  return(length(intersect(data_list[[name]][[i]]$coauthor_list,data_list[[name]][[j]]$coauthor_list))!=0)
+}
+```
+
+Define contraints 6
+
+
 
 Objective Function 
 ```{r}
+# This function compute the objective function at the point defined by the distance matrix D , the vector of labels l and the Matrix Y of centroids. The name and the number of document is also required. w2 and w6 and t are three hyperparameters fixed at w2 = 0.7 and w6 = w2**t with t = ?
+objective = function(A, l, Y, name, k, w2 = 0.7, w6 = w2**t){
+  obj = 0
+  for(i in dim(A)[1]){
+    for(j in dim(A)[1]){
+      obj = obj + (l[i]==l[j]) * distance(A,as.matrix(dtm_train[[k]])[i,],as.matrix(dtm_train[[k]])[j,]) * (w2 * constraint2(i,j,name) + w6 * constraint6(i,j,name))
+    }  
+  }
+  for(i in dim(A)[1]){
+    obj = obj + distance(A,as.matrix(dtm_train[[k]])[i,],Y[l[i],])
+  }
+}
 
+# t, how to get it from the data.
 ```
 
-Hmrf-em algorith
+
+Hmrf-em algorithm
 ```{r}
+
 ```
 
 
