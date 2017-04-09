@@ -209,7 +209,73 @@ constraint2 <-function(i,j,name){
 ```
 
 Define contraints 6
+```{r}
+#get p(number of unique authors in all n publications)
+p<-function(i,j,name){     
+  return(length(union(data_list[[name]][[i]]$coauthor_list, data_list[[name]][[j]]$coauthor_list)))
+}
+#get the vector of all unique authors{a1...ap}, which have length p
+all_authors<-function(i,j,name){
+  return(union(data_list[[name]][[i]]$coauthor_list, data_list[[name]][[j]]$coauthor_list))
+}
 
+#get n(number of publications)
+n<-ncol(dtm_train_tfidf[[i]])###i refer to 1-14, which corresponds to the name
+
+M_pp<-diag(n)
+M_pa<-matrix(0,n,p(i,j,name))   #p should be a result of function
+M_ap<-matrix(0,p,n(i,j,name),n)
+for(j in 1:p(i,j,name)){     #p is p function result
+  for(i in 1:n)
+  if (length(intersect(all_authors[j],data_list[[name]][[i]]$coauthor_list))==1){
+    M_pa[i,j]==1
+    M_ap[j,i]==1
+  }
+}
+#Here with tha matrix M_aa, the paper said to calculate the coauthorship in the whole database (I want to skip this part)
+database_pubs<-function(i,j)
+M_aa<-matrix(0,p(i,j,name),p(i,j,name))
+author_in_the_paper<-matrix(NA,p,n)
+for (i in 1:p(i,j,name)){
+  for(j in 1:n)
+  if (intersect(all_authors[i],data_list[[name]][[j]]$coauthor_list)==1){
+    author_in_the_paper[i,j]<-1
+  }
+}
+for(i in 1:p(i,j,name)){
+  for(j in 1:p(i,j,name)){
+    for (k in 1:n){
+      if (author_in_the_paper[i,k]==author_in_the_paper[j,k]==1){
+        M_aa[i,j]<-1
+      }
+    }
+  }
+}
+#This matrix needs simplification because I want once i and j has the same paper, the for loop stops
+
+
+M<-cbind(rbind(M_pp,M_ap),rbind(M_pa,M_aa))
+tao<-matrix(0,n,n)
+M1<-M %*% M
+for(i in 1:n){
+  for(j in 1:n){
+    if (M1[i,j]==1){tao[i,j]==1}
+  }
+}
+M2<-M1 %*% M
+for(i in 1:n){
+  for(j in 1:n){
+    if (M2[i,j]==1){tao[i,j]==2}
+  }
+}
+M3<M2 %*% M
+for(i in 1:n){
+  for(j in 1:n){
+    if (M3[i,j]==1){tao[i,j]==3}
+  }
+}
+#We only tried until 3, which is enough. We get a tao, which is a matrix between papers
+```
 
 
 Objective Function 
