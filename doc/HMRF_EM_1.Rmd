@@ -280,49 +280,102 @@ for(i in 1:n){
 
 Objective Function 
 ```{r}
-# This function compute the objective function at the point defined by the distance matrix D , the vector of labels l and the Matrix Y of centroids. The name and the number of document is also required. w2 and w6 and t are three hyperparameters fixed at w2 = 0.7 and w6 = w2**t with t = ?
-objective = function(A, l, Y, name, k, w2 = 0.7, w6 = w2**t){
+# This function compute the objective function at the point defined by the distance matrix D , the vector of labels l and the Matrix Y of centroids. The name and the number of document is also required. w2 and w6 and t are three hyperparameters fixed at w2 = 0.7 and w6 = w2**t with t = ?. d is the author name number (Gupta is number 1), k the number of cluster.
+
+objective = function(A, l, Y, name, d, t, w2 = 0.7, w6 = w2**t){
   obj = 0
-  for(i in dim(A)[1]){
-    for(j in dim(A)[1]){
-      obj = obj + (l[i]==l[j]) * distance(A,as.matrix(dtm_train[[k]])[i,],as.matrix(dtm_train[[k]])[j,]) * (w2 * constraint2(i,j,name) + w6 * constraint6(i,j,name))
+  for(i in dim(dtm_train[[d]])[1]){
+    for(j in dim(dtm_train[[d]])[1]){
+      obj = obj + (l[i]==l[j]) * distance(A,as.matrix(dtm_train[[d]])[i,],as.matrix(dtm_train[[d]])[j,]) * (w2 * constraint2(i,j,name) + w6 * constraint6(i,j,name))
     }  
   }
-  for(i in dim(A)[1]){
-    obj = obj + distance(A,as.matrix(dtm_train[[k]])[i,],Y[l[i],])
+  for(i in dim(dtm_train[[d]])[1]){
+    obj = obj + distance(A,as.matrix(dtm_train[[d]])[i,],Y[l[i],])
   }
+  return(obj)
 }
 
-# t, how to get it from the data.
 ```
 
 
 Hmrf-em algorithm
 ```{r}
-# E -step
-#######I don't know what the objective function returns in the function definition, we need this to update yh
+#initialisation : 
+# - first clustering respecting the constraints c2 and c6 in k groups ; and A = identity
+# can do using constraint2 and constraint6
 
+#E-step
+Estep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t){
+  #first generate the random orderand loop over them
+  random_order = sample(1:dim(A)[1],dim(A)[1])
+  for(i in random_order){
+    # now we are going to compute all f ( y h , x i )  and take the min of it
+    u = 1
+    f = distance(A,as.matrix(dtm_train[[d]])[i,],Y[1,])
+    for(j in 1:k){
+      f2 = distance(A,as.matrix(dtm_train[[d]])[i,],Y[j,])
+      if(f2<f){
+        u = j
+        f = f2
+      }
+    }
+    l[i] = j
+  }
+  return(l)
+}
 
-
-#M-step#######not sure about my expression of the numerator of yh (so I also didn't change the part in partial_D_xiyh)
-yh_m<-sum(xi)/(sqrt(t(xi) %*% A %*% xi)[1])
+#Mstep
+Mstep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t, eta){
+  #update Y first:
+  for(j in 1:k){
+    X = as.matrix(dtm_train[[d]])[l==j,] #subset the Xi to the one with the label
+    Y[j,] = col_sums(X)
+    Y[j,] = Y[j,]/(sqrt((t(Y[j,]) %*% A %*% Y[j,])[1]))
+  }
   
-#parameter amm update:(amm update the diagnal element of matrix a)
-amm<-1 #initialization
-partial_D_xixj<-(xi[m]*xj[m]*sqrt(t(xi) %*% A %*% xi)[1] *sqrt(t(xj) %*% A %*% xj)[1] - 
-  t(xi) %*% A %*% xj %*%(((xi[m])^2 %*%t(xj) %*% A %*% xj +(xj[m])^2 %*%t(xi) %*% A %*% xi)/(2*sqrt(t(xi) %*% A %*% xi)[1] *sqrt(t(xj) %*% A %*% xj)[1])))/(t(xi) %*% A %*% xi %*% (t(xj) %*% A %*% xj))
-
-
-#######Just change every xj to sum(xi)
-partial_D_xiyh<-(xi[m]*xj[m]*sqrt(t(xi) %*% A %*% xi)[1] *sqrt(t(xj) %*% A %*% xj)[1] - 
-  t(xi) %*% A %*% xj %*%(((xi[m])^2 %*%t(xj) %*% A %*% xj +(xj[m])^2 %*%t(xi) %*% A %*% xi)/(2*sqrt(t(xi) %*% A %*% xi)[1] *sqrt(t(xj) %*% A %*% xj)[1])))/(t(xi) %*% A %*% xi %*% (t(xj) %*% A %*% xj))
-
-
-#############
-partial_obj<-#The second part of obj function and changes D(xixj) to partial_D_xixj # +partial_D_xiyh
-
   
-amm<-amm + eta * partial_obj   #need to evaluate eta 
+  #update the distance matrix now
+  m = dim(A)[1]
+  Anew = diag(rep(1,m))
+  
+  for(u in 1:m){
+    add = 0
+    for(i in dim(dtm_train[[d]])[1]){
+      for(j in dim(dtm_train[[d]])[1]){
+        if(i=j){add=add+0}
+        else{
+          xi = as.matrix(dtm_train[[d]])[i,]
+          xj = as.matrix(dtm_train[[d]])[j,]
+          partial_D_xixj = (xi[u] * xj[u] * sqrt((t(xi) %*% A %*% xi)[1]) * sqrt((t(xj) %*% A %*% xj)[1]) - 
+  (t(xi) %*% A %*% xj)[1] * (((xi[u])^2 * (t(xj) %*% A %*% xj)[1] + (xj[u])^2 * (t(xi) %*% A %*% xi)[1]) / (2*sqrt((t(xi) %*% A %*% xi)[1]) *sqrt((t(xj) %*% A %*% xj)[1])))) / ((t(xi) %*% A %*% xi)[1] * (t(xj) %*% A %*% xj)[1])
+          
+          add = add + partial_D_xixj * (w2 * constraint2(i,j,name) + w6 * constraint6(i,j,name))
+        }
+      }
+    }
+    
+    for(i in dim(dtm_train[[d]])[1]){
+      xi = as.matrix(dtm_train[[d]])[i,]
+      y = Y[l[i],]
+      partial_D_xiy = (xi[u] * y[u] * sqrt((t(xi) %*% A %*% xi)[1]) * sqrt((t(y) %*% A %*% y)[1]) - 
+  (t(xi) %*% A %*% y)[1] * (((xi[u])^2 * (t(y) %*% A %*% y)[1] + (y[u])^2 * (t(xi) %*% A %*% xi)[1]) / (2*sqrt((t(xi) %*% A %*% xi)[1]) *sqrt((t(y) %*% A %*% y)[1])))) / ((t(xi) %*% A %*% xi)[1] * (t(y) %*% A %*% y)[1])
+      add = add + partial_D_xiy
+    }
+    Anew[u,u] = A[u,u] + eta * add
+  }
+  
+  return(Anew)
+}
+```
+
+EM algorithm completed - to be continued - pseudo-code
+```{r}
+EM_algorithm = function(initial A, initial clustering l,ini){
+  while(not converged i.e. objective function moving){
+    call E function updating l
+    call M function updating Y and A
+  }
+}
 ```
 
 
