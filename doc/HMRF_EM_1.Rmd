@@ -299,7 +299,30 @@ objective = function(A, l, Y, name, k, w2 = 0.7, w6 = w2**t){
 
 Hmrf-em algorithm
 ```{r}
+# E -step
+#######I don't know what the objective function returns in the function definition, we need this to update yh
 
+
+
+#M-step#######not sure about my expression of the numerator of yh (so I also didn't change the part in partial_D_xiyh)
+yh_m<-sum(xi)/(sqrt(t(xi) %*% A %*% xi)[1])
+  
+#parameter amm update:(amm update the diagnal element of matrix a)
+amm<-1 #initialization
+partial_D_xixj<-(xi[m]*xj[m]*sqrt(t(xi) %*% A %*% xi)[1] *sqrt(t(xj) %*% A %*% xj)[1] - 
+  t(xi) %*% A %*% xj %*%(((xi[m])^2 %*%t(xj) %*% A %*% xj +(xj[m])^2 %*%t(xi) %*% A %*% xi)/(2*sqrt(t(xi) %*% A %*% xi)[1] *sqrt(t(xj) %*% A %*% xj)[1])))/(t(xi) %*% A %*% xi %*% (t(xj) %*% A %*% xj))
+
+
+#######Just change every xj to sum(xi)
+partial_D_xiyh<-(xi[m]*xj[m]*sqrt(t(xi) %*% A %*% xi)[1] *sqrt(t(xj) %*% A %*% xj)[1] - 
+  t(xi) %*% A %*% xj %*%(((xi[m])^2 %*%t(xj) %*% A %*% xj +(xj[m])^2 %*%t(xi) %*% A %*% xi)/(2*sqrt(t(xi) %*% A %*% xi)[1] *sqrt(t(xj) %*% A %*% xj)[1])))/(t(xi) %*% A %*% xi %*% (t(xj) %*% A %*% xj))
+
+
+#############
+partial_obj<-#The second part of obj function and changes D(xixj) to partial_D_xixj # +partial_D_xiyh
+
+  
+amm<-amm + eta * partial_obj   #need to evaluate eta 
 ```
 
 
