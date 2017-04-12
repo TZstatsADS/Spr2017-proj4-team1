@@ -123,7 +123,7 @@ for (j in 1:length(data.files)) {
              tokenizer = word_tokenizer,
              ids =paper_id,
              progressbar = FALSE)
-vocab[[j]] <- create_vocabulary(it_train_list, stopwords = c("a", "an", "the", "in", "on",
+vocab[[j]] <- create_vocabulary(it_train_list[[j]], stopwords = c("a", "an", "the", "in", "on",
                                                    "at", "of", "above", "under"))
 
 vocab[[j]]
@@ -167,27 +167,6 @@ dtm_train_tfidf[[i]] <- fit_transform(dtm_train[[i]], tfidf)
 
 ## Step 3: Write HMRF EM Algorithm
 
-Construct Sets of must-link Constraints - to be explained
-```{r}
-M <- list(1:length(data.files))
-for (i in 1:length(data.files)){
-  #calculate n and p
-  n <- length(data_list[[i]])
-  group <- data_list[[i]]
-  coauthor_list <- vector(length=0)
-  for(j in 1:n){
-    coauthor_list_add <- group[[j]]$coauthor_list
-    coauthor_list <-c(coauthor_list,coauthor_list_add)
-  }
-  coauthor_list <- unique(coauthor_list)
-  p <- length(coauthor_list)
-  
-  #construct submatrix
-  Mp <- diag(n)
-}
-
-```
-
 Define distance function D(xi,xj)
 ```{r}
 # This function compute the distance as described in the paper using a (squared) matrix A and two vectors of the same length. Vectors must have the same lenght of the dimention of the matrix. 
@@ -203,77 +182,65 @@ distance = function(A,xi,xj){
 
 Define contraints 2
 ```{r}
-constraint2 <-function(i,j,name){
-  return(length(intersect(data_list[[name]][[i]]$coauthor_list,data_list[[name]][[j]]$coauthor_list))!=0)
+constraint2 <-function(i,j,d){
+  return(length(intersect(data_list[[d]][[i]]$coauthor_list,data_list[[d]][[j]]$coauthor_list))!=0)
 }
 ```
 
 Define contraints 6
 ```{r}
-#get p(number of unique authors in all n publications)
-p<-function(i,j,name){     
-  return(length(union(data_list[[name]][[i]]$coauthor_list, data_list[[name]][[j]]$coauthor_list)))
-}
-#get the vector of all unique authors{a1...ap}, which have length p
-all_authors<-function(i,j,name){
-  return(union(data_list[[name]][[i]]$coauthor_list, data_list[[name]][[j]]$coauthor_list))
-}
-
-#get n(number of publications)
-n<-ncol(dtm_train_tfidf[[i]])###i refer to 1-14, which corresponds to the name
-
-M_pp<-diag(n)
-M_pa<-matrix(0,n,p(i,j,name))   #p should be a result of function
-M_ap<-matrix(0,p,n(i,j,name),n)
-for(j in 1:p(i,j,name)){     #p is p function result
-  for(i in 1:n)
-  if (length(intersect(all_authors[j],data_list[[name]][[i]]$coauthor_list))==1){
-    M_pa[i,j]==1
-    M_ap[j,i]==1
+M <- list(1:length(data.files))
+for (d in 1:length(data.files)){
+  #calculate n and p
+  n <- length(data_list[[d]])
+  group <- data_list[[d]]
+  coauthor_list <- vector(length=0)
+  for(j in 1:n){
+    coauthor_list_add <- group[[j]]$coauthor_list
+    coauthor_list <-c(coauthor_list,coauthor_list_add)
   }
-}
-#Here with tha matrix M_aa, the paper said to calculate the coauthorship in the whole database (I want to skip this part)
-database_pubs<-function(i,j)
-M_aa<-matrix(0,p(i,j,name),p(i,j,name))
-author_in_the_paper<-matrix(NA,p,n)
-for (i in 1:p(i,j,name)){
-  for(j in 1:n)
-  if (intersect(all_authors[i],data_list[[name]][[j]]$coauthor_list)==1){
-    author_in_the_paper[i,j]<-1
-  }
-}
-for(i in 1:p(i,j,name)){
-  for(j in 1:p(i,j,name)){
-    for (k in 1:n){
-      if (author_in_the_paper[i,k]==author_in_the_paper[j,k]==1){
-        M_aa[i,j]<-1
-      }
+  coauthor_list <- unique(coauthor_list)
+  p <- length(coauthor_list)
+  
+  #construct submatrix
+  #construct Mp
+  Mp <- diag(n)
+  #construct Map
+  Map <- Matrix(rep(0,n*p),p,n)
+  for(j in 1:p){
+    for(i in 1:n){
+       Map[j,i] =ifelse(coauthor_list[j] %in% group[[i]]$coauthor_list,1,0)
+       #whether aj is the co-author in pi
+    }
+        }
+  #transform the Matrix
+  #construct Mpa
+  Mpa <- t(Map)
+  
+  #construct Ma(let's limit our database in the data_list)
+  Ma <- Matrix(rep(0,p^2),p,p)
+  for (i in 1:p){
+    for(j in 1:p){
+      #Ma[i,j]=1 indicates coauthor_i and coauthor_j in the same publication
+      #if both Map[i,m]=1 & Mpa[m,j]=1, Ma[i,j]=1
+         Ma[i,j]=ifelse(Map[i,]%*%Mpa[,j]>0,1,0)
     }
   }
-}
-#This matrix needs simplification because I want once i and j has the same paper, the for loop stops
 
+    
+  M[[d]] <- cbind(rbind(Mp,Map),rbind(Mpa,Ma))
+}
 
-M<-cbind(rbind(M_pp,M_ap),rbind(M_pa,M_aa))
-tao<-matrix(0,n,n)
-M1<-M %*% M
-for(i in 1:n){
-  for(j in 1:n){
-    if (M1[i,j]==1){tao[i,j]==1}
-  }
+##Assume t=2, then we get 2-coauthor constraint
+M2 <- list(1:length(data.files))
+for (i in 1:length(data.files)){
+  M2[[d]] <- M[[i]]%*%M[[i]]%*%M[[i]]
 }
-M2<-M1 %*% M
-for(i in 1:n){
-  for(j in 1:n){
-    if (M2[i,j]==1){tao[i,j]==2}
-  }
+
+constraint6 <-function(i,j,d){
+  return(M2[[d]][i,j])
 }
-M3<M2 %*% M
-for(i in 1:n){
-  for(j in 1:n){
-    if (M3[i,j]==1){tao[i,j]==3}
-  }
-}
+
 #We only tried until 3, which is enough. We get a tao, which is a matrix between papers
 ```
 
@@ -282,15 +249,15 @@ Objective Function
 ```{r}
 # This function compute the objective function at the point defined by the distance matrix D , the vector of labels l and the Matrix Y of centroids. The name and the number of document is also required. w2 and w6 and t are three hyperparameters fixed at w2 = 0.7 and w6 = w2**t with t = ?. d is the author name number (Gupta is number 1), k the number of cluster.
 
-objective = function(A, l, Y, name, d, t, w2 = 0.7, w6 = w2**t){
+objective = function(A, l, Y, d, w2 = 0.7, w6 = 0.7^2){
   obj = 0
-  for(i in dim(dtm_train[[d]])[1]){
-    for(j in dim(dtm_train[[d]])[1]){
-      obj = obj + (l[i]==l[j]) * distance(A,as.matrix(dtm_train[[d]])[i,],as.matrix(dtm_train[[d]])[j,]) * (w2 * constraint2(i,j,name) + w6 * constraint6(i,j,name))
+  for(i in dim(dtm_train_tfidf[[d]])[1]){
+    for(j in dim(dtm_train_tfidf[[d]])[1]){
+      obj = obj + (l[i]==l[j]) * distance(A,as.matrix(dtm_train_tfidf[[d]])[i,],as.matrix(dtm_train_tfidf[[d]])[j,]) * (w2 * constraint2(i,j,d) + w6 * constraint6(i,j,d))
     }  
   }
-  for(i in dim(dtm_train[[d]])[1]){
-    obj = obj + distance(A,as.matrix(dtm_train[[d]])[i,],Y[l[i],])
+  for(i in dim(dtm_train_tfidf[[d]])[1]){
+    obj = obj + distance(A,as.matrix(dtm_train_tfidf[[d]])[i,],Y[l[i],])
   }
   return(obj)
 }
@@ -322,15 +289,22 @@ Initialization <-function(A,d){
   }
   
   if(lambda<k){
-    while(k-lambda>0){
-      ind=sample(size=k-lambda,dim(dtm_train[[d]])[1],replace=FALSE)
-      for (i in ind){
-         if(length(l[l==l[ind]])>1){l[ind]=lambda+1}
+    
+      for(i in 1:lambda){
+        #calculate centroids
+    X = as.matrix(dtm_train[[d]])[l==i,] #subset the Xi to the one with the label
+    Y[i,] = col_sums(X)
+    Y[i,] = Y[i,]/(sqrt((t(Y[i,]) %*% A %*% Y[i,])[1]))
       }
-       lambda=length(unique(l))
-       print(l)
+    glo_Y = rowSums(Y)
+    glo_Y =glo_Y/(sqrt((t(glo_Y) %*% A %*% glo_Y)[1]))
+    while(k-lambda>0){
+      lambda=lambda+1
+      Y[lambda,]=glo_Y+rnorm(n=dim(dtm_train[[d]])[2],mean=0,sd=(3)^(1/3))
     }
-  }
+    l=Estep(A, l, Y, d, k , t, w2 = 0.7, w6 = w2**t)
+    }
+  
   
   else if(lambda>k){
     #calculate the distances between clusters and combine the closest together
@@ -359,7 +333,7 @@ Initialization <-function(A,d){
 }
 
 #E-step
-Estep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t){
+Estep = function(A, l, Y, d, k , w2 = 0.7, w6 = 0.7^2){
   #first generate the random orderand loop over them
   random_order = sample(1:dim(A)[1],dim(A)[1])
   for(i in random_order){
@@ -379,7 +353,7 @@ Estep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t){
 }
 
 #Mstep
-Mstep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t, eta){
+Mstep = function(A, l, Y, name, d, k ,w2 = 0.7, w6 = 0.7^2, eta){
   #update Y first:
   for(j in 1:k){
     X = as.matrix(dtm_train[[d]])[l==j,] #subset the Xi to the one with the label
