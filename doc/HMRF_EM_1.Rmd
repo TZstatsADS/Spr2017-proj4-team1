@@ -441,17 +441,30 @@ $$
 $$
 
 ```{r}
-source('~/Dropbox/Project4_WhoIsWho/lib/evaluation_measures.R')
-matching_matrix_hclust <- matching_matrix(AKumar$AuthorID,result_hclust)
-performance_hclust <- performance_statistics(matching_matrix_hclust)
-matching_matrix_sclust <- matching_matrix(AKumar$AuthorID,result_sclust)
-performance_sclust <- performance_statistics(matching_matrix_sclust)
-compare_df <- data.frame(method=c("sClust","hClust"),
-                         precision=c(performance_sclust$precision, performance_hclust$precision),
-                         recall=c(performance_sclust$recall, performance_hclust$recall),
-                         f1=c(performance_sclust$f1, performance_hclust$f1),
-                         accuracy=c(performance_sclust$accuracy, performance_hclust$accuracy),
-                         time=c(time_sclust,time_hclust))
-kable(compare_df,caption="Comparision of performance for two clustering methods",digits = 2)
+source('~/Github/Spr2017-proj4-team1/lib/evaluation_measures.R')
+
+###############result_EM is the clustering result, please notice
+#
+
+evaluation<-function(name){
+  author_id_list<-c()
+  for (i in length(dtm_train[[1]][1])){
+    #############[[1]]indicates that the first matrix of the list, but I want it to correspond the name and don't know if there is any
+    anthor_id_list[i]<-data_list[[name]][[i]]$author_id
+  }
+    
+  matching_matrix_EM <- matching_matrix(author_id_list,result_EM)
+  performance_EM <- performance_statistics(matching_matrix_EM)
+  compare_df <- data.frame(method=c("EM"),
+                         precision=c(performance_EM$precision),
+                         recall=c(performance_EM$recall),
+                         f1=c(performance_EM$f1),
+                         accuracy=c(performance_EM$accuracy),
+                         time=c(time_EM))
+  return(kable(compare_df,caption="Performance of the HMRF-EM Algorithm",digits = 2))
+}
+
+
+#We also need to compare EM between SVM in paper 2
 ```
 
