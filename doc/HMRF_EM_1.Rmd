@@ -209,6 +209,14 @@ constraint2 <-function(i,j,name){
 ```
 
 Define contraints 6
+
+```{r}
+
+```
+
+
+
+Define contraints 6 - bis
 ```{r}
 #get p(number of unique authors in all n publications)
 p<-function(i,j,name){     
@@ -275,6 +283,11 @@ for(i in 1:n){
   }
 }
 #We only tried until 3, which is enough. We get a tao, which is a matrix between papers
+
+constraint6 = function(i,j,d){
+  return(M3[[d]][i,j])
+}
+
 ```
 
 
@@ -303,6 +316,9 @@ Hmrf-em algorithm
 #initialisation : 
 # - first clustering respecting the constraints c2 and c6 in k groups ; and A = identity
 # can do using constraint2 and constraint6
+
+# remark: can cast to matrix the data before running the EM algorithm
+
 
 #E-step
 Estep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t){
@@ -343,7 +359,7 @@ Mstep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t, eta){
     for(i in dim(dtm_train[[d]])[1]){
       for(j in dim(dtm_train[[d]])[1]){
         if(i=j){add=add+0}
-        else{
+        else{ #can use crossprod instead of %*% for faster result
           xi = as.matrix(dtm_train[[d]])[i,]
           xj = as.matrix(dtm_train[[d]])[j,]
           partial_D_xixj = (xi[u] * xj[u] * sqrt((t(xi) %*% A %*% xi)[1]) * sqrt((t(xj) %*% A %*% xj)[1]) - 
@@ -364,16 +380,39 @@ Mstep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t, eta){
     Anew[u,u] = A[u,u] + eta * add
   }
   
-  return(Anew)
+  L = list(Y,Anew)
+  return(L)
 }
 ```
 
+Initialisation
+```{r}
+
+```
+
+
 EM algorithm completed - to be continued - pseudo-code
 ```{r}
-EM_algorithm = function(initial A, initial clustering l,ini){
-  while(not converged i.e. objective function moving){
-    call E function updating l
-    call M function updating Y and A
+EM_algorithm = function(A, l, name, d, k, t, w2 = 0.7, w6 = w2**t ,epsilon, eta){
+  obj = Inf
+  while(TRUE){
+    #first get the updated l
+    l = Estep(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t)
+    
+    #second, get the updated Y and A
+    L = Mstep(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t, eta)
+    Y = L[[1]]
+    A = L[[2]]
+    
+    #Get new value of obj and compare to decide wether to stop the algorithm or not
+    objnew = objective(A, l, Y, name, d, t, w2 = 0.7, w6 = w2**t)
+    
+    if(abs(obj-objnew)<epsilon){
+      return(l)
+    }
+    else{
+      obj = objnew
+    }
   }
 }
 ```
@@ -381,6 +420,7 @@ EM_algorithm = function(initial A, initial clustering l,ini){
 
 ## Step 4: Clustering
 ```{r}
+
 ```
 
 ## Step 5: Evaluation
