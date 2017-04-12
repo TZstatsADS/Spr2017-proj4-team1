@@ -233,6 +233,7 @@ for(j in 1:p(i,j,name)){     #p is p function result
   }
 }
 #Here with tha matrix M_aa, the paper said to calculate the coauthorship in the whole database (I want to skip this part)
+database_pubs<-function(i,j)
 M_aa<-matrix(0,p(i,j,name),p(i,j,name))
 author_in_the_paper<-matrix(NA,p,n)
 for (i in 1:p(i,j,name)){
