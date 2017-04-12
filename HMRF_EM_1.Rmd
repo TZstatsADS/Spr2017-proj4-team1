@@ -1,0 +1,417 @@
+---
+title: "HMRFEM Model"
+author: "Yuan Mei"
+date: "4/07/2017"
+output: pdf_document
+---
+
+## Step 0: Load the packages, specify directories
+
+```{r}
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(text2vec, dplyr, qlcMatrix, kernlab, knitr)
+library("stringr")
+
+setwd("~/GitHub/Spr2017-proj4-team1/data")
+# here replace it with your own path or manually set it in RStudio
+# to where this rmd file is located
+```
+
+## Step 1: Load and process the data
+```{r}
+#get author_id, paper_id, coauthor_list, paper_title, journal name
+data.lib="~//GitHub/Spr2017-proj4-team1/data/nameset"
+data.files=list.files(path=data.lib, "*.txt")
+data.files
+### remove "*.txt"
+query.list=substring(data.files, 
+                     1, nchar(data.files)-4)
+
+query.list
+## add a space
+query.list=paste(substring(query.list, 1, 1), 
+                 " ", 
+                 substring(query.list, 
+                           2, nchar(query.list)),
+                 sep=""
+)
+
+query.list
+
+# Write a function to get the list of author_id, paper_id, coauthor_list, paper_title, journal name
+
+f.line.proc=function(lin, nam.query="."){
+  
+  # remove unwanted characters
+  char_notallowed <- "\\@#$%^&?" 
+  lin.str=str_replace(lin, char_notallowed, "")
+  
+  # get author id
+  lin.str=strsplit(lin.str, "_")[[1]]
+  author_id=as.numeric(lin.str[1])
+  
+  # get paper id
+  lin.str=lin.str[2]
+  paper_id=strsplit(lin.str, " ")[[1]][1]
+  lin.str=substring(lin.str, nchar(paper_id)+1, nchar(lin.str))
+  paper_id=as.numeric(paper_id)
+  
+  # get coauthor list
+  lin.str=strsplit(lin.str, "<>")[[1]]
+  coauthor_list=strsplit(lin.str[1], ";")[[1]]
+  
+  #print(lin.str)
+  for(j in 1:length(coauthor_list)){
+    if(nchar(coauthor_list[j])>0){
+      nam = strsplit(coauthor_list[j], " ")[[1]]
+      if(nchar(nam[1])>0){
+        first.ini=substring(nam[1], 1, 1)
+      }else{
+        first.ini=substring(nam[2], 1, 1)
+      }
+    }
+    last.name=nam[length(nam)]
+    nam.str = paste(first.ini, last.name)
+    coauthor_list[j]=nam.str
+  }
+  
+  match_ind = charmatch(nam.query, coauthor_list, nomatch=-1)
+  
+  #print(nam.query)
+  #print(coauthor_list)
+  #print(match_ind)
+  
+  if(match_ind>0){
+    
+    coauthor_list=coauthor_list[-match_ind]
+  }
+  
+  paper_title=lin.str[2]
+  journal_name=lin.str[3]
+  
+  list(author_id=author_id, 
+       paper_id=paper_id, 
+       coauthor_list=coauthor_list, 
+       paper_title=paper_title, 
+       journal_name=journal_name)
+}
+
+#read data
+data_list=list(1:length(data.files))
+
+for(i in 1:length(data.files)){
+  
+  dat=as.list(readLines(paste(data.lib, data.files[i], sep="/")))
+  data_list[[i]]=lapply(dat, f.line.proc, nam.query=query.list[i])
+  
+  
+}
+names(data_list)=query.list
+```
+
+## Step 2: Feature design
+Let's first create a vocabulary-based DTM. Here we collect unique terms from all documents and mark each of them with a unique ID using the  `create_vocabulary()` function. We use an iterator to create the vocabulary.
+```{r}
+it_train_list <- list(1:length(data.files))
+vocab <- list(1:length(data.files))
+for (j in 1:length(data.files)) {
+  data_unlist <- unlist(data_list[[j]])
+  paper_title<- as.vector(data_unlist[which(names(data_unlist)=="paper_title")])
+  paper_id<- as.vector(data_unlist[which(names(data_unlist)=="paper_id")])
+  it_train_list[[j]] <- itoken(paper_title, 
+             preprocessor = tolower, 
+             tokenizer = word_tokenizer,
+             ids =paper_id,
+             progressbar = FALSE)
+vocab[[j]] <- create_vocabulary(it_train_list, stopwords = c("a", "an", "the", "in", "on",
+                                                   "at", "of", "above", "under"))
+
+vocab[[j]]
+  
+  
+}
+```
+
+Here, we remove pre-defined stopwords, the words like ??a??, ??the??, ??in??, ??I??, ??you??, ??on??, etc, which do not provide much useful information. 
+
+Now that we have a vocabulary list, we can construct a document-term matrix.
+```{r}
+#construct DTM
+vectorizer <- list(1:length(data.files))
+dtm_train <- list(1:length(data.files))
+for(i in 1:length(data.files)){
+  vectorizer[[i]] <- vocab_vectorizer(vocab[[i]])
+  dtm_train[[i]] <- create_dtm(it_train_list[[i]], vectorizer[[i]])
+}
+
+```
+
+Now we have DTM and can check its dimensions.
+```{r}
+for (i in 1:length(data.files)){
+print(dim(dtm_train[[i]]))
+}
+```
+
+
+Then, we want to use DTM to compute TF-IDF transformation on DTM.
+```{r}
+dtm_train_tfidf  <- list(1:length(data.files))
+
+for(i in 1:length(data.files)){
+tfidf <- TfIdf$new()
+dtm_train_tfidf[[i]] <- fit_transform(dtm_train[[i]], tfidf)
+}
+
+```
+
+## Step 3: Write HMRF EM Algorithm
+
+Construct Sets of must-link Constraints - to be explained
+```{r}
+M <- list(1:length(data.files))
+for (i in 1:length(data.files)){
+  #calculate n and p
+  n <- length(data_list[[i]])
+  group <- data_list[[i]]
+  coauthor_list <- vector(length=0)
+  for(j in 1:n){
+    coauthor_list_add <- group[[j]]$coauthor_list
+    coauthor_list <-c(coauthor_list,coauthor_list_add)
+  }
+  coauthor_list <- unique(coauthor_list)
+  p <- length(coauthor_list)
+  
+  #construct submatrix
+  Mp <- diag(n)
+}
+
+```
+
+Define distance function D(xi,xj)
+```{r}
+# This function compute the distance as described in the paper using a (squared) matrix A and two vectors of the same length. Vectors must have the same lenght of the dimention of the matrix. 
+distance = function(A,xi,xj){
+  A = as.matrix(A)
+  xi = as.matrix(xi)
+  xj = as.matrix(xj)
+  normxi = sqrt(t(xi) %*% A %*% xi)[1]
+  normxj = sqrt(t(xj) %*% A %*% xj)[1]
+  return(1 - (t(xi) %*% A %*% xj)[1]/(normxi*normxj))
+}
+```
+
+Define contraints 2
+```{r}
+constraint2 <-function(i,j,name){
+  return(length(intersect(data_list[[name]][[i]]$coauthor_list,data_list[[name]][[j]]$coauthor_list))!=0)
+}
+```
+
+Define contraints 6
+```{r}
+#get p(number of unique authors in all n publications)
+p<-function(i,j,name){     
+  return(length(union(data_list[[name]][[i]]$coauthor_list, data_list[[name]][[j]]$coauthor_list)))
+}
+#get the vector of all unique authors{a1...ap}, which have length p
+all_authors<-function(i,j,name){
+  return(union(data_list[[name]][[i]]$coauthor_list, data_list[[name]][[j]]$coauthor_list))
+}
+
+#get n(number of publications)
+n<-ncol(dtm_train_tfidf[[i]])###i refer to 1-14, which corresponds to the name
+
+M_pp<-diag(n)
+M_pa<-matrix(0,n,p(i,j,name))   #p should be a result of function
+M_ap<-matrix(0,p,n(i,j,name),n)
+for(j in 1:p(i,j,name)){     #p is p function result
+  for(i in 1:n)
+  if (length(intersect(all_authors[j],data_list[[name]][[i]]$coauthor_list))==1){
+    M_pa[i,j]==1
+    M_ap[j,i]==1
+  }
+}
+#Here with tha matrix M_aa, the paper said to calculate the coauthorship in the whole database (I want to skip this part)
+database_pubs<-function(i,j)
+M_aa<-matrix(0,p(i,j,name),p(i,j,name))
+author_in_the_paper<-matrix(NA,p,n)
+for (i in 1:p(i,j,name)){
+  for(j in 1:n)
+  if (intersect(all_authors[i],data_list[[name]][[j]]$coauthor_list)==1){
+    author_in_the_paper[i,j]<-1
+  }
+}
+for(i in 1:p(i,j,name)){
+  for(j in 1:p(i,j,name)){
+    for (k in 1:n){
+      if (author_in_the_paper[i,k]==author_in_the_paper[j,k]==1){
+        M_aa[i,j]<-1
+      }
+    }
+  }
+}
+#This matrix needs simplification because I want once i and j has the same paper, the for loop stops
+
+
+M<-cbind(rbind(M_pp,M_ap),rbind(M_pa,M_aa))
+tao<-matrix(0,n,n)
+M1<-M %*% M
+for(i in 1:n){
+  for(j in 1:n){
+    if (M1[i,j]==1){tao[i,j]==1}
+  }
+}
+M2<-M1 %*% M
+for(i in 1:n){
+  for(j in 1:n){
+    if (M2[i,j]==1){tao[i,j]==2}
+  }
+}
+M3<M2 %*% M
+for(i in 1:n){
+  for(j in 1:n){
+    if (M3[i,j]==1){tao[i,j]==3}
+  }
+}
+#We only tried until 3, which is enough. We get a tao, which is a matrix between papers
+```
+
+
+Objective Function 
+```{r}
+# This function compute the objective function at the point defined by the distance matrix D , the vector of labels l and the Matrix Y of centroids. The name and the number of document is also required. w2 and w6 and t are three hyperparameters fixed at w2 = 0.7 and w6 = w2**t with t = ?. d is the author name number (Gupta is number 1), k the number of cluster.
+
+objective = function(A, l, Y, name, d, t, w2 = 0.7, w6 = w2**t){
+  obj = 0
+  for(i in dim(dtm_train[[d]])[1]){
+    for(j in dim(dtm_train[[d]])[1]){
+      obj = obj + (l[i]==l[j]) * distance(A,as.matrix(dtm_train[[d]])[i,],as.matrix(dtm_train[[d]])[j,]) * (w2 * constraint2(i,j,name) + w6 * constraint6(i,j,name))
+    }  
+  }
+  for(i in dim(dtm_train[[d]])[1]){
+    obj = obj + distance(A,as.matrix(dtm_train[[d]])[i,],Y[l[i],])
+  }
+  return(obj)
+}
+
+```
+
+
+Hmrf-em algorithm
+```{r}
+#initialisation : 
+# - first clustering respecting the constraints c2 and c6 in k groups ; and A = identity
+# can do using constraint2 and constraint6
+
+#E-step
+Estep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t){
+  #first generate the random orderand loop over them
+  random_order = sample(1:dim(A)[1],dim(A)[1])
+  for(i in random_order){
+    # now we are going to compute all f ( y h , x i )  and take the min of it
+    u = 1
+    f = distance(A,as.matrix(dtm_train[[d]])[i,],Y[1,])
+    for(j in 1:k){
+      f2 = distance(A,as.matrix(dtm_train[[d]])[i,],Y[j,])
+      if(f2<f){
+        u = j
+        f = f2
+      }
+    }
+    l[i] = j
+  }
+  return(l)
+}
+
+#Mstep
+Mstep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t, eta){
+  #update Y first:
+  for(j in 1:k){
+    X = as.matrix(dtm_train[[d]])[l==j,] #subset the Xi to the one with the label
+    Y[j,] = col_sums(X)
+    Y[j,] = Y[j,]/(sqrt((t(Y[j,]) %*% A %*% Y[j,])[1]))
+  }
+  
+  
+  #update the distance matrix now
+  m = dim(A)[1]
+  Anew = diag(rep(1,m))
+  
+  for(u in 1:m){
+    add = 0
+    for(i in dim(dtm_train[[d]])[1]){
+      for(j in dim(dtm_train[[d]])[1]){
+        if(i=j){add=add+0}
+        else{
+          xi = as.matrix(dtm_train[[d]])[i,]
+          xj = as.matrix(dtm_train[[d]])[j,]
+          partial_D_xixj = (xi[u] * xj[u] * sqrt((t(xi) %*% A %*% xi)[1]) * sqrt((t(xj) %*% A %*% xj)[1]) - 
+  (t(xi) %*% A %*% xj)[1] * (((xi[u])^2 * (t(xj) %*% A %*% xj)[1] + (xj[u])^2 * (t(xi) %*% A %*% xi)[1]) / (2*sqrt((t(xi) %*% A %*% xi)[1]) *sqrt((t(xj) %*% A %*% xj)[1])))) / ((t(xi) %*% A %*% xi)[1] * (t(xj) %*% A %*% xj)[1])
+          
+          add = add + partial_D_xixj * (w2 * constraint2(i,j,name) + w6 * constraint6(i,j,name))
+        }
+      }
+    }
+    
+    for(i in dim(dtm_train[[d]])[1]){
+      xi = as.matrix(dtm_train[[d]])[i,]
+      y = Y[l[i],]
+      partial_D_xiy = (xi[u] * y[u] * sqrt((t(xi) %*% A %*% xi)[1]) * sqrt((t(y) %*% A %*% y)[1]) - 
+  (t(xi) %*% A %*% y)[1] * (((xi[u])^2 * (t(y) %*% A %*% y)[1] + (y[u])^2 * (t(xi) %*% A %*% xi)[1]) / (2*sqrt((t(xi) %*% A %*% xi)[1]) *sqrt((t(y) %*% A %*% y)[1])))) / ((t(xi) %*% A %*% xi)[1] * (t(y) %*% A %*% y)[1])
+      add = add + partial_D_xiy
+    }
+    Anew[u,u] = A[u,u] + eta * add
+  }
+  
+  return(Anew)
+}
+```
+
+EM algorithm completed - to be continued - pseudo-code
+```{r}
+EM_algorithm = function(initial A, initial clustering l,ini){
+  while(not converged i.e. objective function moving){
+    call E function updating l
+    call M function updating Y and A
+  }
+}
+```
+
+
+## Step 4: Clustering
+```{r}
+```
+
+## Step 5: Evaluation
+
+To evaluate the performance of the method, it is required to calculate the degree of agreement between a set of system-output partitions and a set of true partitions. In general, the agreement between two partitioins is measured for a pair of entities within partitions. The basic unit for which pair-wise agreement is assessed is a pair of entities (authors in our case) which belongs to one of the four cells in the following table (Kang et at.(2009)):
+
+\includegraphics[width=500pt]{matching_matrix.png}
+
+Let $M$ be the set of machine-generated clusters, and $G$ the set of gold standard clusters. Then. in the table, for example, $a$ is the number of pairs of entities that are assigned to the same cluster in each of $M$ and $G$. Hence, $a$ and $d$ are interpreted as agreements, and $b$ and $c$ disagreements. When the table is considered as a confusion matrix for a two-class prediction problem, the standard "Precision", "Recall","F1", and "Accuracy" are defined as follows.
+
+$$
+\begin{aligned}
+\mbox{Precision} &=\frac{a}{a+b}\\
+\mbox{Recall}&=\frac{a}{a+c}\\
+\mbox{F1} &=\frac{2\times\mbox{Precision}\times\mbox{Recall}}{\mbox{Precision}+\mbox{Recall}}\\
+\mbox{Accuracy}&=\frac{a+d}{a+b+c+d}
+\end{aligned}
+$$
+
+```{r}
+source('~/Dropbox/Project4_WhoIsWho/lib/evaluation_measures.R')
+matching_matrix_hclust <- matching_matrix(AKumar$AuthorID,result_hclust)
+performance_hclust <- performance_statistics(matching_matrix_hclust)
+matching_matrix_sclust <- matching_matrix(AKumar$AuthorID,result_sclust)
+performance_sclust <- performance_statistics(matching_matrix_sclust)
+compare_df <- data.frame(method=c("sClust","hClust"),
+                         precision=c(performance_sclust$precision, performance_hclust$precision),
+                         recall=c(performance_sclust$recall, performance_hclust$recall),
+                         f1=c(performance_sclust$f1, performance_hclust$f1),
+                         accuracy=c(performance_sclust$accuracy, performance_hclust$accuracy),
+                         time=c(time_sclust,time_hclust))
+kable(compare_df,caption="Comparision of performance for two clustering methods",digits = 2)
+```
+
