@@ -232,21 +232,14 @@ n<-ncol(dtm_train_tfidf[[i]])###i refer to 1-14, which corresponds to the name
 
 M_pp<-diag(n)
 M_pa<-matrix(0,n,p(i,j,name))   #p should be a result of function
-M_ap<-matrix(0,p,n(i,j,name),n)
-for(j in 1:p(i,j,name)){     #p is p function result
-  for(i in 1:n)
-  if (length(intersect(all_authors[j],data_list[[name]][[i]]$coauthor_list))==1){
-    M_pa[i,j]==1
-    M_ap[j,i]==1
-  }
-}
+M_ap<-t(M_pa)
+
 #Here with tha matrix M_aa, the paper said to calculate the coauthorship in the whole database (I want to skip this part)
-database_pubs<-function(i,j)
 M_aa<-matrix(0,p(i,j,name),p(i,j,name))
-author_in_the_paper<-matrix(NA,p,n)
+author_in_the_paper<-matrix(0,p(i,j),n)
 for (i in 1:p(i,j,name)){
   for(j in 1:n)
-  if (intersect(all_authors[i],data_list[[name]][[j]]$coauthor_list)==1){
+  if (intersect(all_authors(i,j)[i],data_list[[name]][[j]]$coauthor_list)==1){
     author_in_the_paper[i,j]<-1
   }
 }
