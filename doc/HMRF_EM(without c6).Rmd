@@ -114,12 +114,10 @@ Let's first create a vocabulary-based DTM. Here we collect unique terms from all
 ```{r}
 it_train_list <- list(1:length(data.files))
 vocab <- list(1:length(data.files))
-author_id<-list(1:length(data.files))
 for (j in 1:length(data.files)) {
   data_unlist <- unlist(data_list[[j]])
   paper_title<- as.vector(data_unlist[which(names(data_unlist)=="paper_title")])
   paper_id<- as.vector(data_unlist[which(names(data_unlist)=="paper_id")])
-  author_id[[j]]<- as.vector(data_unlist[which(names(data_unlist)=="author_id")])
   it_train_list[[j]] <- itoken(paper_title, 
              preprocessor = tolower, 
              tokenizer = word_tokenizer,
@@ -182,9 +180,14 @@ distance = function(A,xi,xj){
 }
 ```
 
+Define contraints 2
+```{r}
+constraint2 <-function(i,j,d){
+  return(length(intersect(data_list[[d]][[i]]$coauthor_list,data_list[[d]][[j]]$coauthor_list))!=0)
+}
+```
 
-
-Define contraints 2& 6
+Define contraints 6
 ```{r}
 M <- list(1:length(data.files))
 for (d in 1:length(data.files)){
@@ -228,25 +231,14 @@ for (d in 1:length(data.files)){
   M[[d]] <- cbind(rbind(Mp,Map),rbind(Mpa,Ma))
 }
 
-M1 <- list(1:length(data.files))
-for (i in 1:length(data.files)){
-  M1[[d]] <- M[[d]]%*%M[[d]]
-}
-
 ##Assume t=2, then we get 2-coauthor constraint
 M2 <- list(1:length(data.files))
 for (i in 1:length(data.files)){
   M2[[d]] <- M[[d]]%*%M[[d]]%*%M[[d]]
 }
 
-constraint2 <-function(i,j,d){
-  c6<-ifelse(M1[[d]][i,j]>=1,1,0)
-  return(c6)
-}
-
 constraint6 <-function(i,j,d){
-  c6<-ifelse(M2[[d]][i,j]>=1,1,0)
-  return(c6)
+  return(M2[[d]][i,j])
 }
 
 #We only tried until 3, which is enough. We get a tao, which is a matrix between papers
@@ -255,16 +247,13 @@ constraint6 <-function(i,j,d){
 
 Objective Function 
 ```{r}
-# This function compute the objective function at the point defined by the distance matrix D , the vector of labels l and the Matrix Y of centroids. The name and the number of document is also required. w2 and w6 and t are three hyperparameters fixed at w2 = 0.7 and w6 = w2**t with t = ?. d is the author name number (Gupta is number 1), k the number of cluster. 
+# This function compute the objective function at the point defined by the distance matrix D , the vector of labels l and the Matrix Y of centroids. The name and the number of document is also required. w2 and w6 and t are three hyperparameters fixed at w2 = 0.7 and w6 = w2**t with t = ?. d is the author name number (Gupta is number 1), k the number of cluster.
 
-#number of clusters:
-k=length(unique(author_id))
-
-objective = function(A, l, Y, d, w2 = 0.7, w6 = 0.7^2){
+objective = function(A, l, Y, d, w2 = 0.7){
   obj = 0
   for(i in dim(dtm_train_tfidf[[d]])[1]){
     for(j in dim(dtm_train_tfidf[[d]])[1]){
-      obj = obj + (l[i]==l[j]) * distance(A,as.matrix(dtm_train_tfidf[[d]])[i,],as.matrix(dtm_train_tfidf[[d]])[j,]) * (w2 * constraint2(i,j,d) + w6 * constraint6(i,j,d))
+      obj = obj + (l[i]==l[j]) * distance(A,as.matrix(dtm_train_tfidf[[d]])[i,],as.matrix(dtm_train_tfidf[[d]])[j,]) * (w2 * constraint2(i,j,d) )
     }  
   }
   for(i in dim(dtm_train_tfidf[[d]])[1]){
@@ -275,109 +264,80 @@ objective = function(A, l, Y, d, w2 = 0.7, w6 = 0.7^2){
 
 ```
 
-
-Hmrf-em algorithm
-#initiialization
 ```{r}
+#initialisation : 
+# - first clustering respecting the constraints c2 and c6 in k groups ; and A = identity
+# can do using constraint2 and constraint6
+#we need to define A
 #Initialization
 Initialization <-function(A,d){
   #create index set
-  index=1:dim(dtm_train_tfidf[[d]])[1]
+  index=1:dim(dtm_train[[d]])[1]
   #define label
   l=vector()
   #initial label
   lambda=0
-  index_new=index
-  
   while(length(index)>0){
      lambda=lambda+1
-     #print(paste("lambda=",lambda))
-     
     for (j in index){
     i=index[1]
-    if(constraint2(i,j,1)>0|constraint6(i,j,1)>0)
-      {
-    dele = which(index_new==j)
-    index_new <- index_new[-dele]#remove index already belong to a cluster
-    l[j]=lambda
-     }
+    if(constraint2(i,j,name)=0 & constraint6(i,j,name)!=0){index=index[-j]}#remove index already belong to a cluster
+    else{l[j]=lambda}
     }
-    index=index_new
-    #print(paste("index=",index[1],"length=",length(index)))
   }
   
   if(lambda<k){
     
       for(i in 1:lambda){
         #calculate centroids
-    X = as.matrix(dtm_train_tfidf[[d]])[l==i,] #subset the Xi to the one with the label
-    Y=matrix(NA,lambda,dim(dtm_train_tfidf[[d]])[2])
+    X = as.matrix(dtm_train[[d]])[l==i,] #subset the Xi to the one with the label
+    Y[i,] = col_sums(X)
     Y[i,] = Y[i,]/(sqrt((t(Y[i,]) %*% A %*% Y[i,])[1]))
       }
     glo_Y = rowSums(Y)
     glo_Y =glo_Y/(sqrt((t(glo_Y) %*% A %*% glo_Y)[1]))
     while(k-lambda>0){
       lambda=lambda+1
-      Y[lambda,]=glo_Y+rnorm(n=dim(dtm_train_tfidf[[d]])[2],mean=0,sd=(3)^(1/3))
+      Y[lambda,]=glo_Y+rnorm(n=dim(dtm_train[[d]])[2],mean=0,sd=(3)^(1/3))
     }
-    l=Estep(A, l, Y, d, k , w2 = 0.7, w6 = 0.7^2)
+    l=Estep(A, l, Y, d, k ,w2 = 0.7)
     }
   
   
   else if(lambda>k){
-
-    X = as.matrix(dtm_train_tfidf[[d]])
     #calculate the distances between clusters and combine the closest together
-   #too slow so deciede to use kmeans
-    #while(lambda-k>0){
-       Y=matrix(NA,lambda,dim(dtm_train_tfidf[[d]])[2])
+    while(lambda-k>0){
       for(i in 1:lambda){
         #calculate centroids
-    Z=as.matrix(X[l==i,],ncol=dim(dtm_train_tfidf[[d]])[2])#subset the Xi to the one with the label
-    Y[i,] = colSums(Z)
-    Y[i,] = Y[i,]/(sqrt((t(Y[i,]) %*% A %*% Y[i,])[1]))
+    X = as.matrix(dtm_train[[d]])[l==i,] #subset the Xi to the one with the label
+    Y[i,] = col_sums(X)
+    Y[i,] = Y[j,]/(sqrt((t(Y[j,]) %*% A %*% Y[j,])[1]))
       }
-      cluster_label=kmeans(Y,centers=k)$cluster
-      #re-order the cluster number
-      
-
-      uni=unique(cluster_label)
-      for(j in 1:k){
-        loc=which(cluster_label==uni[j])
-        
-        for(i in loc){
-        l[l==i]=j
+      #calculate distances between cluster j and cluster h
+      dis=matrix(NA,lambda,lambda)
+      for(j in 1:lambda){
+        for(h in (j+1):lambda){
+          dis[j,h]=distance(A,Y[j,],Y[h,])
         }
       }
-      
-      
-     
-      #calculate distances between cluster j and cluster h
-       #we create an upper matrix. we assign half of the values as a very large number.
-     # dis=matrix(100,lambda,lambda)
-      #for(j in 1:lambda){
-      #  for(h in (j+1):lambda){
-      #    dis[j,h]=distance(A,Y[j,],Y[h,])
-      #    print(dis[j,h])
-      #  }
-    #  }
       #find the closest two clusters and assign the larger index cluster to the lower index              cluster
-    #k1=which(dis==min(dis),arr.ind=TRUE)[1]
-    #k2=which(dis==min(dis),arr.ind=TRUE)[2]
-    #l[l==max(k1,k2)]=min(k1,k2)
-    #lambda=lambda-1
-   # }
+    k1=which.min(dis,arr.id=TRUE)[1]
+    k2=which.min(dis,arr.id=TRUE)[2]
+    l[l==max(k1,k2)]=min(k1,k2)
+    lambda=lambda-1
+    }
   }
   return(l)
 }
 ```
 
+
+Hmrf-em algorithm
 ```{r}
-# - first clustering respecting the constraints c2 and c6 in k groups ; and A = identity
-# can do using constraint2 and constraint6
-#we need to define A
+
+
 #E-step
-Estep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t){
+Estep = function(A, l, Y, d, k , w2 = 0.7, w6 = 0.7^2){
   #first generate the random orderand loop over them
   random_order = sample(1:dim(A)[1],dim(A)[1])
   for(i in random_order){
@@ -397,7 +357,7 @@ Estep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t){
 }
 
 #Mstep
-Mstep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t, eta){
+Mstep = function(A, l, Y, name, d, k ,w2 = 0.7, w6 = 0.7^2, eta){
   #update Y first:
   for(j in 1:k){
     X = as.matrix(dtm_train[[d]])[l==j,] #subset the Xi to the one with the label
@@ -415,7 +375,7 @@ Mstep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t, eta){
     for(i in dim(dtm_train[[d]])[1]){
       for(j in dim(dtm_train[[d]])[1]){
         if(i=j){add=add+0}
-        else{ #can use crossprod instead of %*% for faster result
+        else{
           xi = as.matrix(dtm_train[[d]])[i,]
           xj = as.matrix(dtm_train[[d]])[j,]
           partial_D_xixj = (xi[u] * xj[u] * sqrt((t(xi) %*% A %*% xi)[1]) * sqrt((t(xj) %*% A %*% xj)[1]) - 
@@ -436,11 +396,9 @@ Mstep = function(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t, eta){
     Anew[u,u] = A[u,u] + eta * add
   }
   
-  L = list(Y,Anew)
-  return(L)
+  return(Anew)
 }
 ```
-
 
 EM algorithm completed - to be continued - pseudo-code
 ```{r}
