@@ -18,12 +18,6 @@ Term: Spring 2017
 + Team members
 	+ Mei, Yuan (UNI:ym2583)
 	+ Ruscassie, Raphael (UNI:rlr2166)
-	+ Wang, Zhishan (UNI:zw2362)
-	+ Zhou, Yuxi (UNI:yz3048)
-	+ Zhu, He (UNI:hz2429)
-        
-	+ Mei, Yuan (UNI:ym2583)
-	+ Ruscassie, Raphael (UNI:rlr2166)
 	+ Wang, Zhishan (UNI:zw2362): Assisted in setting up the SVM model.
 	+ Zhou, Yuxi (UNI:yz3048)
 	+ Zhu, He (UNI:hz2429): Set the SVM model.
