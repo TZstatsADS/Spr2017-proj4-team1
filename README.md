@@ -17,7 +17,7 @@ Term: Spring 2017
 **Contribution statement**:   
 + Team members
 	+ Mei, Yuan (UNI:ym2583): Built the main structure of the HMRF-EM algorithm, the main coding person and data cleaning of Paper 6.
-	+ Ruscassie, Raphael (UNI:rlr2166):Helped built EM algorithm of Paper 6.
+	+ Ruscassie, Raphael (UNI:rlr2166):Helped in building EM algorithm of Paper 6.
 	+ Wang, Zhishan (UNI:zw2362): Assisted in setting up the SVM model of Paper 2.
 	+ Zhou, Yuxi (UNI:yz3048) : Built constraints and evaluation of Paper 6, help with other parts and presenter.
 	+ Zhu, He (UNI:hz2429): Built the main structure of the SVM model of Paper 2 and helped in coding of Paper 6 .
