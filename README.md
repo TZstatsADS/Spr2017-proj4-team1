@@ -14,7 +14,7 @@ Term: Spring 2017
 	+ Zhu, He (UNI:hz2429)
 + Project summary: 
 	
-**Contribution statement**: He Zhu and Zhishan Wang studied Ppaer 2. And the rest studied Ppaer 6. 
+**Contribution statement**: He Zhu and Zhishan Wang studied Ppaer 2. And the rest studied Paper 6. 
 + Team members
 	+ Mei, Yuan (UNI:ym2583)
 	+ Ruscassie, Raphael (UNI:rlr2166)
