@@ -13,6 +13,7 @@ Term: Spring 2017
 	+ Zhou, Yuxi (UNI:yz3048)
 	+ Zhu, He (UNI:hz2429)
 + Project summary: 
+In paper 2, we utilize SVM model to solve the name disambiguation in author citations. In SVM, coauthor names appear to be the most robust attribute for name disambiguation; using coauthor information alone performs consistently well in all the datasets. Using journal title words usually gives better performance than using paper title words. In paper 6, we make attempts to vectorize each loop to reduce the running time, and use permutation to test the clustring sequence which gives the most accurate result.
 	
 **Contribution statement**:   
 + Team members
