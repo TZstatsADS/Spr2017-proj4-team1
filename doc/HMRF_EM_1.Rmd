@@ -36,6 +36,7 @@ query.list=paste(substring(query.list, 1, 1),
                  sep=""
 )
 
+
 query.list
 
 # Write a function to get the list of author_id, paper_id, coauthor_list, paper_title, journal name
