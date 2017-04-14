@@ -15,7 +15,14 @@ Term: Spring 2017
 + Project summary: 
 	
 **Contribution statement**: He Zhu and Zhishan Wang studied Ppaer 2. And the rest studied Ppaer 6. 
-        + Mei, Yuan (UNI:ym2583)
++ Team members
+	+ Mei, Yuan (UNI:ym2583)
+	+ Ruscassie, Raphael (UNI:rlr2166)
+	+ Wang, Zhishan (UNI:zw2362)
+	+ Zhou, Yuxi (UNI:yz3048)
+	+ Zhu, He (UNI:hz2429)
+        
+	+ Mei, Yuan (UNI:ym2583)
 	+ Ruscassie, Raphael (UNI:rlr2166)
 	+ Wang, Zhishan (UNI:zw2362): Assisted in setting up the SVM model.
 	+ Zhou, Yuxi (UNI:yz3048)
