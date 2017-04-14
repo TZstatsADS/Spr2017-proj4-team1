@@ -17,7 +17,7 @@ In paper 2, we utilize SVM model to solve the name disambiguation in author cita
 	
 **Contribution statement**:   
 + Team members
-	+ Mei, Yuan (UNI:ym2583): Built the main structure of the HMRF-EM algorithm, the main coding person and data cleaning of Paper 6.
+	+ Mei, Yuan (UNI:ym2583): Built the main structure of the HMRF-EM algorithm, the main coding person of Paper 6.
 	+ Ruscassie, Raphael (UNI:rlr2166):Helped in building EM algorithm of Paper 6.
 	+ Wang, Zhishan (UNI:zw2362): Assisted in setting up the SVM model of Paper 2.
 	+ Zhou, Yuxi (UNI:yz3048) : Built constraints and evaluation of Paper 6, help with other parts and presenter.
