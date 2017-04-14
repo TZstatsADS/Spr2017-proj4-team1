@@ -260,15 +260,15 @@ Objective Function
 #number of clusters:
 #k=length(unique(author_id))
 
-objective = function(A, l, Y, d, w2 = 0.7, w6 = 0.7^2){
-  obj = 0
-  for(i in dim(dtm_train_tfidf[[d]])[1]){
-    for(j in dim(dtm_train_tfidf[[d]])[1]){
-      obj = obj + (l[i]==l[j]) * distance(A,as.matrix(dtm_train_tfidf[[d]])[i,],as.matrix(dtm_train_tfidf[[d]])[j,]) * (w2 * constraint2(i,j,d) + w6 * constraint6(i,j,d))
+objective = function(Y, i,h, d, w2 = 0.7, w6 = 0.7^2){
+  
+  X_paper=as.matrix(dtm_train_tfidf[[d]])
+  X_paper1=X_paper[l!=h]
+  obj = distance(A,X_paper[i,],Y[h,])
+  for(i in nrow(X_paper1)){
+    for(j in nrow(X_paper1)){
+      obj = obj + distance(A,X_paper1[i,],X_paper1[j,]) * (w2 * constraint2(i,j,d) + w6 * constraint6(i,j,d))
     }  
-  }
-  for(i in dim(dtm_train_tfidf[[d]])[1]){
-    obj = obj + distance(A,as.matrix(dtm_train_tfidf[[d]])[i,],Y[l[i],])
   }
   return(obj)
 }
@@ -280,7 +280,7 @@ Hmrf-em algorithm
 #initiialization
 ```{r}
 #Initialization
-Initialization <-function(A,d){
+Initialization <-function(A,d, Y){
   #create index set
   index=1:dim(dtm_train_tfidf[[d]])[1]
   #define label
@@ -335,7 +335,7 @@ Initialization <-function(A,d){
         #calculate centroids
     Z=as.matrix(X[l==i,],ncol=dim(dtm_train_tfidf[[d]])[2])#subset the Xi to the one with the label
     Y[i,] = colSums(Z)
-    Y[i,] = Y[i,]/(sqrt((t(Y[i,]) %*% A %*% Y[i,])[1]))
+    Y[i,] = Y[i,]/(crossprod(Y[i,],A)%*% Y[i,])[1]
       }
       cluster_label=kmeans(Y,centers=k)$cluster
       #re-order the cluster number
@@ -377,22 +377,22 @@ Initialization <-function(A,d){
 # can do using constraint2 and constraint6
 #we need to define A
 #E-step
-#Takes 3-mins 
+#Takes 5-mins 
 Estep = function(A, l, Y, d, w2 = 0.7, w6 = w2^2){
   #first generate the random orderand loop over them
-  random_order = sample(1:length(l),length(l))
-  for(i in random_order){
+ random_order = sample(1:length(l),length(l))
+  for(i in 1:length(l)){
     # now we are going to compute all f ( y h , x i )  and take the min of it
     u = 1
     f2=vector()
     for(j in 1:k){
-      f2[j] = distance(A,as.matrix(dtm_train_tfidf[[d]])[i,],Y[j,])
+      f2[j] = objective(Y=Y, i=i,  h=j, d=d)
       }
     l[i] = which.min(f2)
   }
   return(l)
 }
-
+ 
 
 #Mstep
 Mstep = function(A, l, Y, d,w2 = 0.7, w6 = w2^2, eta){
@@ -402,70 +402,78 @@ Mstep = function(A, l, Y, d,w2 = 0.7, w6 = w2^2, eta){
     X = as.matrix(dtm_train_tfidf[[d]])
     Z=as.matrix(X[l==j,],ncol=dim(dtm_train_tfidf[[d]])[2])#subset the Xi to the one with the label
     Y[j,] = col_sums(Z)
-    Y[j,] = Y[j,]/(sqrt((t(Y[j,]) %*% A %*% Y[j,])[1]))
+    Y[j,] = Y[j,]/(crossprod(Y[j,],A)%*% Y[j,])[1]
   }
   
   
   #update the distance matrix now
   m = dim(A)[1]
   Anew = diag(rep(1,m))
+  Add=diag(rep(NA,m))
+  data=as.matrix(dtm_train_tfidf[[d]])
+    #compute norm matrix
+  norm=tcrossprod((data%*%A),data)
+  sqr_norm=sqrt(norm)
   
-  for(u in 1:m){
-    add = 0
-    for(i in dim(dtm_train_tfidf[[d]])[1]){
-      for(j in dim(dtm_train_tfidf[[d]])[1]){
-        if(i=j){add=add+0}
-        else{ #can use crossprod instead of %*% for faster result
-          xi = as.matrix(dtm_train_tfidf[[d]])[i,]
-          xj = as.matrix(dtm_train_tfidf[[d]])[j,]
-          partial_D_xixj = as.numeric((xi[u] * xj[u] * sqrt((t(xi) %*% A %*% xi)[1]) * sqrt((t(xj) %*% A %*% xj)[1]) - 
-  (t(xi) %*% A %*% xj)[1] * (((xi[u])^2 * (t(xj) %*% A %*% xj)[1] + (xj[u])^2 * (t(xi) %*% A %*% xi)[1]) / (2*sqrt((t(xi) %*% A %*% xi)[1]) *sqrt((t(xj) %*% A %*% xj)[1])))) / ((t(xi) %*% A %*% xi)[1] * (t(xj) %*% A %*% xj)[1]))
-          
-          add = add + partial_D_xixj * (w2 * constraint2(i,j,d) + w6 * constraint6(i,j,d))
-        }
-      }
-    }
+    for(i in 1:length(l)){
+      
+      xi = diag(data[i,])
+      y=diag(Y[l[i],])
+      normxiy=(crossprod(xi,A)%*% y)[1]
+      normy=sqrt(crossprod(y,A)%*% y)[1]
+    partial_D_xiy = (xi%*%y)/(normxi*normy)-(xi%*%xi)*normxij/(2*normxi*normy^3)-(y%*%y)*normxiy/(2*normxi^3*normy)
     
-    for(i in dim(dtm_train[[d]])[1]){
-      xi = as.matrix(dtm_train[[d]])[i,]
-      y = Y[l[i],]
-      partial_D_xiy = (xi[u] * y[u] * sqrt((t(xi) %*% A %*% xi)[1]) * sqrt((t(y) %*% A %*% y)[1]) - 
-  (t(xi) %*% A %*% y)[1] * (((xi[u])^2 * (t(y) %*% A %*% y)[1] + (y[u])^2 * (t(xi) %*% A %*% xi)[1]) / (2*sqrt((t(xi) %*% A %*% xi)[1]) *sqrt((t(y) %*% A %*% y)[1])))) / ((t(xi) %*% A %*% xi)[1] * (t(y) %*% A %*% y)[1])
-      add = add + partial_D_xiy
+      for(j in 1:length(l)){
+        if(j!=i)
+          { 
+          xj = diag(data[j,])
+          normxi = sqr_norm[i,i]
+          normxj = sqr_norm[j,j]
+          normxij=norm[i,j]
+  
+  partial_D_xixj = (xi%*%xj)/(normxi*normxj)-(xi%*%xi)*normxij/(2*normxi*normxj^3)-(xj%*%xj)*normxij/(2*normxi^3*normxj)
+  
+          
+            Add = Add + partial_D_xixj * (w2 * constraint2(i,j,d) + w6 * constraint6(i,j,d))
+        }
+        
+      }
+    Add = Add + partial_D_xiy
     }
-    Anew[u,u] = A[u,u] + eta * add
-  }
-  A=Anew
- 
-  return(Y)
+    #update the matrix
+    
+    Anew= A[u,u] + eta * Add
+
+ diff=A-Anew
+  return(list(Y=Y,A=Anew,diff=diff))
 }
 ```
 
 
 EM algorithm completed - to be continued - pseudo-code
 ```{r}
-EM_algorithm = function(A, l, d, t, w2 = 0.7, w6 = w2^t ,epsilon, eta){
-  obj = Inf
+EM_algorithm = function(A, l, d, t=2, w2 = 0.7, w6 = w2^t ,tau, eta, max.iter){
+  
   A=diag(1,dim(dtm_train_tfidf[[d]])[1],dim(dtm_train_tfidf[[d]])[1])
   k=length(unique(author_id[[d]]))
-  while(TRUE){
+  iter=0
+  l=Initialization(A=A,d=d)
+  Y=matrix(NA,k,dim(dtm_train_tfidf[[d]])[2])
+  for(j in 1:k){
+    X = as.matrix(dtm_train_tfidf[[d]])
+    Z=as.matrix(X[l==j,],ncol=dim(X)[2])#subset the Xi to the one with the label
+    Y[j,] = col_sums(Z)
+    Y[j,] = Y[j,]/(crossprod(Y[j,],A)%*% Y[j,])[1]
+  }
+  while(iter<max.iter & norm(diff, type="1") > tau){
     #first get the updated l
-    l = Estep(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t)
-    
-    #second, get the updated Y and A
-    L = Mstep(A, l, Y, name, d, k , t, w2 = 0.7, w6 = w2**t, eta)
-    Y = L[[1]]
-    A = L[[2]]
-    
-    #Get new value of obj and compare to decide wether to stop the algorithm or not
-    objnew = objective(A, l, Y, name, d, t, w2 = 0.7, w6 = w2**t)
-    
-    if(abs(obj-objnew)<epsilon){
-      return(l)
-    }
-    else{
-      obj = objnew
-    }
+    l = Estep(A=A, l=l, Y=Y, d=d, w2 = 0.7, w6 = w2^t)
+    #second, get the updated Y and A and changes between iterations
+    Result = Mstep(A=A, l=l, Y=Y, d=d, w2 = 0.7, w6 = w2^t, eta=eta)
+    Y = Result[[1]]
+    A = Result[[2]]
+    diff=Result[[3]]
+    iter=iter+1
   }
 }
 ```
