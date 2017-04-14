@@ -323,7 +323,7 @@ for (i in 1:4){
 }
 
 colnames(accuracy1)<-c("Paper Title","Journal Title","Coauthor","Hybrid")
-accuracy<-rbind(accuracy1,apply(accuracy1,2,mean),apply(accuracy1,2,sd))
+accuracy1<-rbind(accuracy1,apply(accuracy1,2,mean),apply(accuracy1,2,sd))
 rownames(accuracy1)<-c(query.list,"Mean","StdDev")
 
 ```
