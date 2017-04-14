@@ -20,7 +20,7 @@ setwd("~/GitHub/Spr2017-proj4-team1/data")
 ## Step 1: Load and process the data
 ```{r}
 #get author_id, paper_id, coauthor_list, paper_title, journal name
-data.lib="~//GitHub/Spr2017-proj4-team1/data/nameset"
+data.lib="~/Documents/GitHub/Spr2017-proj4-team1/data/nameset"
 data.files=list.files(path=data.lib, "*.txt")
 data.files
 ### remove "*.txt"
@@ -187,6 +187,7 @@ distance = function(A,xi,xj){
 Define contraints 2& 6
 ```{r}
 M <- list(1:length(data.files))
+#test set D=(3:5,7:14)
 for (d in 1:length(data.files)){
   #calculate n and p
   n <- length(data_list[[d]])
@@ -280,7 +281,7 @@ Hmrf-em algorithm
 #initiialization
 ```{r}
 #Initialization
-Initialization <-function(A,d, Y){
+Initialization <-function(A,d){
   #create index set
   index=1:dim(dtm_train_tfidf[[d]])[1]
   #define label
@@ -295,7 +296,7 @@ Initialization <-function(A,d, Y){
      
     for (j in index){
     i=index[1]
-    if(constraint2(i,j,1)>0|constraint6(i,j,1)>0)
+    if(constraint2(i,j,d)>0|constraint6(i,j,d)>0)
       {
     dele = which(index_new==j)
     index_new <- index_new[-dele]#remove index already belong to a cluster
@@ -419,15 +420,15 @@ Mstep = function(A, l, Y, d,w2 = 0.7, w6 = w2^2, eta){
       
       xi = diag(data[i,])
       y=diag(Y[l[i],])
+      normxi = sqr_norm[i,i]
       normxiy=(crossprod(xi,A)%*% y)[1]
       normy=sqrt(crossprod(y,A)%*% y)[1]
-    partial_D_xiy = (xi%*%y)/(normxi*normy)-(xi%*%xi)*normxij/(2*normxi*normy^3)-(y%*%y)*normxiy/(2*normxi^3*normy)
+    partial_D_xiy = (xi%*%y)/(normxi*normy)-(xi%*%xi)*normxiy/(2*normxi*normy^3)-(y%*%y)*normxiy/(2*normxi^3*normy)
     
       for(j in 1:length(l)){
         if(j!=i)
           { 
           xj = diag(data[j,])
-          normxi = sqr_norm[i,i]
           normxj = sqr_norm[j,j]
           normxij=norm[i,j]
   
@@ -439,10 +440,11 @@ Mstep = function(A, l, Y, d,w2 = 0.7, w6 = w2^2, eta){
         
       }
     Add = Add + partial_D_xiy
+    print(i)
     }
     #update the matrix
     
-    Anew= A[u,u] + eta * Add
+    Anew= A + eta * Add
 
  diff=A-Anew
   return(list(Y=Y,A=Anew,diff=diff))
@@ -452,11 +454,13 @@ Mstep = function(A, l, Y, d,w2 = 0.7, w6 = w2^2, eta){
 
 EM algorithm completed - to be continued - pseudo-code
 ```{r}
-EM_algorithm = function(A, l, d, t=2, w2 = 0.7, w6 = w2^t ,tau, eta, max.iter){
+EM_algorithm = function(l, d, t=2, w2 = 0.7, w6 = w2^t ,tau, eta, max.iter){
   
-  A=diag(1,dim(dtm_train_tfidf[[d]])[1],dim(dtm_train_tfidf[[d]])[1])
+  A=diag(1,dim(dtm_train_tfidf[[d]])[2],dim(dtm_train_tfidf[[d]])[2])
+  p=dim(dtm_train_tfidf[[d]])[2]
   k=length(unique(author_id[[d]]))
   iter=0
+  diff=A
   l=Initialization(A=A,d=d)
   Y=matrix(NA,k,dim(dtm_train_tfidf[[d]])[2])
   for(j in 1:k){
@@ -475,12 +479,17 @@ EM_algorithm = function(A, l, d, t=2, w2 = 0.7, w6 = w2^t ,tau, eta, max.iter){
     diff=Result[[3]]
     iter=iter+1
   }
+  return(list(l=l,A=A))
 }
 ```
 
 
 ## Step 4: Clustering
 ```{r}
+label=list(1:length(data.files))
+for (d in 1:length(data.files)){
+  label[[d]]=EM_algorithm(l=l, d=d, w2 = 0.7, w6 = w2^2 ,tau=0.01, eta=0.01, max.iter=3)[[1]]
+}
 ```
 
 ## Step 5: Evaluation
