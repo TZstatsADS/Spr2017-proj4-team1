@@ -14,13 +14,13 @@ Term: Spring 2017
 	+ Zhu, He (UNI:hz2429)
 + Project summary: 
 	
-**Contribution statement**: He Zhu and Zhishan Wang studied Ppaer 2. And the rest studied Paper 6. 
+**Contribution statement**:   
 + Team members
 	+ Mei, Yuan (UNI:ym2583)
 	+ Ruscassie, Raphael (UNI:rlr2166)
-	+ Wang, Zhishan (UNI:zw2362): Assisted in setting up the SVM model.
+	+ Wang, Zhishan (UNI:zw2362): Assisted in setting up the SVM model of Paper 2.
 	+ Zhou, Yuxi (UNI:yz3048)
-	+ Zhu, He (UNI:hz2429): Built the main structure of the SVM model.
+	+ Zhu, He (UNI:hz2429): Built the main structure of the SVM model of Paper 2 and helped in coding of Paper 6 .
 
 
 Following [suggestions](http://nicercode.github.io/blog/2013-04-05-projects/) by [RICH FITZJOHN](http://nicercode.github.io/about/#Team) (@richfitz). This folder is orgarnized as follows.
