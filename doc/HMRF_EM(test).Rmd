@@ -11,7 +11,7 @@ output: pdf_document
 if (!require("pacman")) install.packages("pacman")
 pacman::p_load(text2vec, dplyr, qlcMatrix, kernlab, knitr)
 library("stringr")
-
+library("gtools")
 setwd("~/GitHub/Spr2017-proj4-team1/data")
 # here replace it with your own path or manually set it in RStudio
 # to where this rmd file is located
@@ -501,17 +501,40 @@ $$
 $$
 
 ```{r}
-source('~/Dropbox/Project4_WhoIsWho/lib/evaluation_measures.R')
-matching_matrix_hclust <- matching_matrix(AKumar$AuthorID,result_hclust)
-performance_hclust <- performance_statistics(matching_matrix_hclust)
-matching_matrix_sclust <- matching_matrix(AKumar$AuthorID,result_sclust)
-performance_sclust <- performance_statistics(matching_matrix_sclust)
-compare_df <- data.frame(method=c("sClust","hClust"),
-                         precision=c(performance_sclust$precision, performance_hclust$precision),
-                         recall=c(performance_sclust$recall, performance_hclust$recall),
-                         f1=c(performance_sclust$f1, performance_hclust$f1),
-                         accuracy=c(performance_sclust$accuracy, performance_hclust$accuracy),
-                         time=c(time_sclust,time_hclust))
-kable(compare_df,caption="Comparision of performance for two clustering methods",digits = 2)
+source('~/Github/Spr2017-proj4-team1/lib/evaluation_measures.R')
+
+performance_EM<-list(1:length(data.files))
+for (d in 1:length(data.files)){
+  
+  table_1<-table(author_id[[d]])
+  table_EM<-table(l)
+  k<-length(table(author_id[[d]]))
+  per<-permutations(k,k,1:k)
+  num<-NULL
+  for (i in 1:nrow(per)){
+    num[i]<-sum(abs(table_EM[per[i,]] - table_1))
+  }
+
+  min_per<-per[which.min(num),]
+  result_EM<-l
+
+
+  for (i in 1:k){
+     result_EM[result_EM == i] <- min_per[i]+100
+  }
+  result_EM< -result_EM- 100
+
+  
+  performance_EM[[d]] <- performance_statistics(matching_matrix(author_id[[d]],result_EM))
+  compare_df <- data.frame(Name=query.list,
+                         precision=performance_EM[[d]][1],
+                         recall=performance_EM[[d]][2],
+                         f1=performance_EM[[d]][3],
+                         accuracy=performance_EM[[d]][4])
+  return(kable(compare_df,caption="Performance of the HMRF-EM Algorithm",digits = 2))
+}
+
+
+#We also need to compare EM between SVM in paper 2
 ```
 
