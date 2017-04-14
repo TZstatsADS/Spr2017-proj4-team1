@@ -14,12 +14,12 @@ Term: Spring 2017
 	+ Zhu, He (UNI:hz2429)
 + Project summary: 
 	
-**Contribution statement**: ([default](doc/a_note_on_contributions.md)) All team members contributed equally in all stages of this project. All team members approve our work presented in this GitHub repository including this contributions statement. 
+**Contribution statement**: He Zhu and Zhishan Wang studied Ppaer 2. And the rest studied Ppaer 6. 
         + Mei, Yuan (UNI:ym2583)
 	+ Ruscassie, Raphael (UNI:rlr2166)
-	+ Wang, Zhishan (UNI:zw2362)
+	+ Wang, Zhishan (UNI:zw2362): Assisted in setting up the SVM model.
 	+ Zhou, Yuxi (UNI:yz3048)
-	+ Zhu, He (UNI:hz2429)
+	+ Zhu, He (UNI:hz2429): Set the SVM model.
 
 
 Following [suggestions](http://nicercode.github.io/blog/2013-04-05-projects/) by [RICH FITZJOHN](http://nicercode.github.io/about/#Team) (@richfitz). This folder is orgarnized as follows.
