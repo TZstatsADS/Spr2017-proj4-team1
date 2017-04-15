@@ -510,37 +510,45 @@ $$
 $$
 
 ```{r}
-source('~/Github/Spr2017-proj4-team1/lib/evaluation_measures.R')
 
-performance_EM<-list(1:length(data.files))
+#Assume we return l which contains 14 list
+answer<-list(1:length(data.files))
 for (d in 1:length(data.files)){
+  author_id_sep<-author_id[[d]]
+  l_sep<-l[[d]]
+
+  evaluation<-function(l_sep,author_id_sep){
+    n <- length(l_sep)
+    author_id_mat <- matrix(NA,n,n)
+    for(i in 1:n){
+      author_id_mat[i,] <- as.numeric(sapply(author_id_sep,"==",author_id_sep[i]))
+    }
   
-  table_1<-table(author_id[[d]])
-  table_EM<-table(l)
-  k<-length(table(author_id[[d]]))
-  per<-permutations(k,k,1:k)
-  num<-NULL
-  for (i in 1:nrow(per)){
-    num[i]<-sum(abs(table_EM[per[i,]] - table_1))
-  }
-
-  min_per<-per[which.min(num),]
-  result_EM<-l
-
-
-  for (i in 1:k){
-     result_EM[result_EM == i] <- min_per[i]+100
-  }
-  result_EM< -result_EM- 100
-
+   l_mat <- matrix(NA,n,n)
   
-  performance_EM[[d]] <- performance_statistics(matching_matrix(author_id[[d]],result_EM))
-  compare_df <- data.frame(Name=query.list,
-                         precision=performance_EM[[d]][1],
-                         recall=performance_EM[[d]][2],
-                         f1=performance_EM[[d]][3],
-                         accuracy=performance_EM[[d]][4])
-  return(kable(compare_df,caption="Performance of the HMRF-EM Algorithm",digits = 2))
+    for(j in 1:n){
+      l_mat[j,] <- sapply(l_sep,"==",l_sep[j])*3+2
+    }
+
+    match_matrix <- author_id_mat +l_mat
+  
+    
+    mis.mis <- sum(match_matrix==2)/2
+  
+    mat.mis <- sum(match_matrix==3)/2
+    
+    mis.mat <- sum(match_matrix==5)/2
+    
+    mat.mat <- (sum(match_matrix==6)-n)/2
+  
+    pre<-mat.mat/(mat.mat+mat.mis)
+    recal<-mat.mat/(mat.mat+mis.mat)
+    F1<-2*pre*recal/(pre+recal)
+    accur<-(mis.mis+mat.mat)/sum(mis.mis,mis.mat,mat.mis,mat.mat)
+    result<-c(pre,recal,F1,accur)
+    return(result)
+  }
+  answer[[i]]<-evaluation(l_sep, author_id_sep)
 }
 
 
